@@ -62,7 +62,14 @@ class _AddMedicationScreenState extends ConsumerState<AddMedicationScreen> {
       await ref
           .read(medicationNotifierProvider.notifier)
           .addMedication(medication);
-      await ReminderService().scheduleMedicationReminder(medication);
+
+      final medications = await ref.read(medicationNotifierProvider.future);
+      final newMedication = medications.lastWhere((m) =>
+          m.name == medication.name &&
+          m.dosage == medication.dosage &&
+          m.frequencyInHours == medication.frequencyInHours);
+
+      await ReminderService().scheduleMedicationReminder(newMedication);
 
       if (mounted) {
         Navigator.of(context).pop();

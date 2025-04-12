@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timezone/data/latest.dart' as tz;
 import 'screens/medication_list_screen.dart';
+import 'services/reminder_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  // Initialize timezone data
+  tz.initializeTimeZones();
 
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  final InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-  );
-
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  // Initialize reminder service
+  await ReminderService().initialize();
 
   runApp(const ProviderScope(child: MyApp()));
 }

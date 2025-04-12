@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:flutter/services.dart';
 import '../models/medication.dart';
 
 class ReminderService {
@@ -10,6 +11,7 @@ class ReminderService {
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  bool _useExactAlarms = true;
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
@@ -41,28 +43,40 @@ class ReminderService {
           nextDoseTime.add(Duration(hours: medication.frequencyInHours));
     }
 
-    await _notificationsPlugin.zonedSchedule(
-      medication.id!,
-      'Medication Reminder',
-      'Time to take ${medication.name} (${medication.dosage})',
-      tz.TZDateTime.from(nextDoseTime, tz.local),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'medication_reminders',
-          'Medication Reminders',
-          channelDescription: 'Notifications for medication reminders',
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        medication.id!,
+        'Medication Reminder',
+        'Time to take ${medication.name} (${medication.dosage})',
+        tz.TZDateTime.from(nextDoseTime, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'medication_reminders',
+            'Medication Reminders',
+            channelDescription: 'Notifications for medication reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
         ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: _useExactAlarms
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } on PlatformException catch (e) {
+      if (e.code == 'exact_alarms_not_permitted') {
+        // Fallback to inexact alarms
+        _useExactAlarms = false;
+        await scheduleMedicationReminder(medication);
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<void> cancelReminder(int medicationId) async {
