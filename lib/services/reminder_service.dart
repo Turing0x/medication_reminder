@@ -2,8 +2,6 @@ import 'dart:isolate';
 import 'dart:ui';
 
 import 'package:alarm/model/volume_settings.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter/services.dart';
 import 'dart:developer' as developer;
@@ -22,7 +20,6 @@ class ReminderService {
   factory ReminderService() => _instance;
   ReminderService._internal();
 
-  bool _useExactAlarms = true;
   PermissionStatus _exactAlarmPermissionStatus = PermissionStatus.granted;
 
   Future<void> initialize() async {
@@ -56,9 +53,7 @@ class ReminderService {
     if (_exactAlarmPermissionStatus.isDenied) {
       final result = await Permission.scheduleExactAlarm.request();
       if (result.isGranted) {
-        _useExactAlarms = true;
       } else {
-        _useExactAlarms = false;
         developer.log('Exact alarm permission denied, using inexact alarms');
       }
     }
@@ -106,7 +101,6 @@ class ReminderService {
     } on PlatformException catch (e) {
       developer.log('Error scheduling reminder: ${e.message}');
       if (e.code == 'exact_alarms_not_permitted') {
-        _useExactAlarms = false;
         await scheduleMedicationReminder(medication);
       } else {
         rethrow;
