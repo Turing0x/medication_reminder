@@ -22,8 +22,6 @@ class ReminderService {
   factory ReminderService() => _instance;
   ReminderService._internal();
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
-      FlutterLocalNotificationsPlugin();
   bool _useExactAlarms = true;
   PermissionStatus _exactAlarmPermissionStatus = PermissionStatus.granted;
 
@@ -42,34 +40,6 @@ class ReminderService {
 
     // Check and request exact alarm permission
     await _checkExactAlarmPermission();
-
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings();
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
-
-    await _notificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        developer.log('Notification clicked: ${response.payload}');
-      },
-    );
-
-    // Request notification permission for Android 13+
-    if (await _notificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.requestNotificationsPermission() ??
-        false) {
-      developer.log('Notification permission granted');
-    }
 
     // Listen for alarm ringing events
     Alarm.ringing.listen((alarmSet) {
@@ -110,41 +80,11 @@ class ReminderService {
         .log('Scheduling reminder for ${medication.name} at $nextDoseTime');
 
     try {
-      // Schedule local notification
-      await _notificationsPlugin.zonedSchedule(
-        medication.id!,
-        'Medication Reminder',
-        'Time to take ${medication.name} (${medication.dosage})',
-        tz.TZDateTime.from(nextDoseTime, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'medication_reminders',
-            'Medication Reminders',
-            channelDescription: 'Notifications for medication reminders',
-            importance: Importance.high,
-            priority: Priority.high,
-            enableVibration: true,
-            enableLights: true,
-            playSound: true,
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        androidScheduleMode: _useExactAlarms
-            ? AndroidScheduleMode.exactAllowWhileIdle
-            : AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time,
-        payload: medication.id.toString(),
-      );
-
       // Schedule alarm using the alarm package
       final alarmSettings = AlarmSettings(
         id: medication.id!,
         dateTime: nextDoseTime,
-        assetAudioPath: 'lib/assets/audio.wav',
+        assetAudioPath: 'assets/audio.mp3',
         loopAudio: true,
         vibrate: true,
         notificationSettings: NotificationSettings(
@@ -157,6 +97,8 @@ class ReminderService {
           fadeDuration: const Duration(seconds: 5),
           volumeEnforced: true,
         ),
+        androidFullScreenIntent: true,
+        warningNotificationOnKill: true,
       );
 
       await Alarm.set(alarmSettings: alarmSettings);
@@ -186,13 +128,11 @@ class ReminderService {
   }
 
   Future<void> cancelReminder(int medicationId) async {
-    await _notificationsPlugin.cancel(medicationId);
     await Alarm.stop(medicationId);
     developer.log('Cancelled reminder for medication ID: $medicationId');
   }
 
   Future<void> rescheduleAllReminders(List<Medication> medications) async {
-    await _notificationsPlugin.cancelAll();
     // Cancel all alarms
     await Alarm.stopAll();
     developer.log('Cancelled all reminders');
