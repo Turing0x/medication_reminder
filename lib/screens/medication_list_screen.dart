@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/medication_provider.dart';
 import '../services/reminder_service.dart';
 import 'add_medication_screen.dart';
+import 'medication_detail_screen.dart';
 
 class MedicationListScreen extends ConsumerWidget {
   const MedicationListScreen({super.key});
@@ -96,6 +97,15 @@ class MedicationListScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => MedicationDetailScreen(
+                            medication: medication,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               );

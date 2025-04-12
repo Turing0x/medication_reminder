@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter/services.dart';
+import 'dart:developer' as developer;
 import '../models/medication.dart';
 
 class ReminderService {
@@ -28,7 +29,21 @@ class ReminderService {
       iOS: initializationSettingsIOS,
     );
 
-    await _notificationsPlugin.initialize(initializationSettings);
+    await _notificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        developer.log('Notification clicked: ${response.payload}');
+      },
+    );
+
+    // Request notification permission for Android 13+
+    if (await _notificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission() ??
+        false) {
+      developer.log('Notification permission granted');
+    }
   }
 
   Future<void> scheduleMedicationReminder(Medication medication) async {
@@ -43,6 +58,9 @@ class ReminderService {
           nextDoseTime.add(Duration(hours: medication.frequencyInHours));
     }
 
+    developer
+        .log('Scheduling reminder for ${medication.name} at $nextDoseTime');
+
     try {
       await _notificationsPlugin.zonedSchedule(
         medication.id!,
@@ -56,8 +74,11 @@ class ReminderService {
             channelDescription: 'Notifications for medication reminders',
             importance: Importance.high,
             priority: Priority.high,
+            enableVibration: true,
+            enableLights: true,
+            playSound: true,
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
@@ -67,10 +88,12 @@ class ReminderService {
             ? AndroidScheduleMode.exactAllowWhileIdle
             : AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
+        payload: medication.id.toString(),
       );
+      developer.log('Reminder scheduled successfully for ${medication.name}');
     } on PlatformException catch (e) {
+      developer.log('Error scheduling reminder: ${e.message}');
       if (e.code == 'exact_alarms_not_permitted') {
-        // Fallback to inexact alarms
         _useExactAlarms = false;
         await scheduleMedicationReminder(medication);
       } else {
@@ -81,10 +104,12 @@ class ReminderService {
 
   Future<void> cancelReminder(int medicationId) async {
     await _notificationsPlugin.cancel(medicationId);
+    developer.log('Cancelled reminder for medication ID: $medicationId');
   }
 
   Future<void> rescheduleAllReminders(List<Medication> medications) async {
     await _notificationsPlugin.cancelAll();
+    developer.log('Cancelled all reminders');
     for (final medication in medications) {
       if (medication.isActive) {
         await scheduleMedicationReminder(medication);
