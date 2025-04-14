@@ -8,6 +8,7 @@ import 'dart:developer' as developer;
 import 'package:alarm/alarm.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/medication.dart';
+import '../services/database_service.dart';
 
 /// The name associated with the UI isolate's [SendPort].
 const String isolateName = 'isolate';
@@ -42,8 +43,31 @@ class ReminderService {
     Alarm.ringing.listen((alarmSet) {
       for (final alarm in alarmSet.alarms) {
         developer.log('Alarm ringing: ${alarm.id}');
+        // Reschedule the alarm for the next dose
+        _rescheduleNextDose(alarm.id);
       }
     });
+  }
+
+  Future<void> _rescheduleNextDose(int medicationId) async {
+    final medication = await _getMedicationById(medicationId);
+    if (medication != null && medication.isActive) {
+      await scheduleMedicationReminder(medication);
+    }
+  }
+
+  Future<Medication?> _getMedicationById(int id) async {
+    final db = await DatabaseService.instance.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      DatabaseService.medicationsTable,
+      where: '${DatabaseService.columnId} = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Medication.fromMap(maps.first);
+    }
+    return null;
   }
 
   Future<void> _checkExactAlarmPermission() async {
@@ -52,8 +76,7 @@ class ReminderService {
 
     if (_exactAlarmPermissionStatus.isDenied) {
       final result = await Permission.scheduleExactAlarm.request();
-      if (result.isGranted) {
-      } else {
+      if (!result.isGranted) {
         developer.log('Exact alarm permission denied, using inexact alarms');
       }
     }
@@ -100,11 +123,7 @@ class ReminderService {
       developer.log('Alarm scheduled successfully for ${medication.name}');
     } on PlatformException catch (e) {
       developer.log('Error scheduling reminder: ${e.message}');
-      if (e.code == 'exact_alarms_not_permitted') {
-        await scheduleMedicationReminder(medication);
-      } else {
-        rethrow;
-      }
+      rethrow;
     }
   }
 
