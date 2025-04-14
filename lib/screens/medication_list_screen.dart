@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/medication_provider.dart';
 import '../services/reminder_service.dart';
-import 'add_medication_screen.dart';
+import 'medication_form_screen.dart';
 import 'medication_detail_screen.dart';
 
 class MedicationListScreen extends ConsumerWidget {
@@ -21,7 +21,7 @@ class MedicationListScreen extends ConsumerWidget {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => const AddMedicationScreen(),
+                  builder: (context) => const MedicationFormScreen(),
                 ),
               );
             },
